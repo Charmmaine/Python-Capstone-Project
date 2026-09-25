@@ -118,7 +118,7 @@ def menu():
     while True:
         print("\n===== HR DATABASE MENU =====")
         print("1. Create a new employee")
-        print("2. Read (look up) an employee")
+        print("2. Read an employee")
         print("3. Update an employee")
         print("4. Delete an employee")
         print("5. Exit")
