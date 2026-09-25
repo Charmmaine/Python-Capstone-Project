@@ -1,0 +1,144 @@
+
+import random
+import sqlite3
+
+random.seed(42)
+
+conn = sqlite3.connect("hr_data.db")
+cursor = conn.cursor()
+
+cursor.execute("DROP TABLE IF EXISTS employees")
+cursor.execute("""
+    CREATE TABLE employees (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        department TEXT,
+        gender TEXT,
+        salary REAL,
+        satisfaction INTEGER,
+        left_company INTEGER
+    )
+""")
+
+# Seed the table with 500 starting employees so there's data to work with
+departments = ["Sales", "Engineering", "Support", "Marketing", "HR", "Finance"]
+dept_base_salary = {"Sales": 58000, "Engineering": 92000, "Support": 48000,
+                     "Marketing": 61000, "HR": 55000, "Finance": 70000}
+
+for i in range(500):
+    dept = random.choices(departments, weights=[28, 22, 20, 12, 8, 10])[0]
+    gender = random.choice(["Male", "Female"])
+    tenure_years = min(int(random.expovariate(1 / 900)), 4000) / 365
+    salary = dept_base_salary[dept] + tenure_years * 1200 + random.gauss(0, 4500)
+    if gender == "Male":
+        salary *= 1.06
+    salary = round(max(salary, 32000), -2)
+    satisfaction = max(1, min(5, round(random.gauss(3.4, 1.0))))
+    leave_prob = {1: 0.62, 2: 0.42, 3: 0.20, 4: 0.08, 5: 0.04}[satisfaction]
+    left = 1 if (random.random() < leave_prob and tenure_years > 0.2) else 0
+    cursor.execute(
+        "INSERT INTO employees (department, gender, salary, satisfaction, left_company) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (dept, gender, salary, satisfaction, left)
+    )
+conn.commit()
+print("Database ready with 500 starting employees.\n")
+
+
+# --------------------------------------------------------------------------
+# CREATE
+# --------------------------------------------------------------------------
+def create_employee():
+    print("\n--- Add a New Employee ---")
+    dept = input("Department: ")
+    gender = input("Gender (Male/Female): ")
+    salary = float(input("Salary: "))
+    satisfaction = int(input("Satisfaction (1-5): "))
+
+    cursor.execute(
+        "INSERT INTO employees (department, gender, salary, satisfaction, left_company) "
+        "VALUES (?, ?, ?, ?, 0)",
+        (dept, gender, salary, satisfaction)
+    )
+    conn.commit()
+    print(f"Added new employee with ID {cursor.lastrowid}.")
+
+
+# --------------------------------------------------------------------------
+# READ
+# --------------------------------------------------------------------------
+def read_employee():
+    emp_id = int(input("\nEnter employee ID to look up: "))
+    cursor.execute("SELECT * FROM employees WHERE id = ?", (emp_id,))
+    row = cursor.fetchone()
+    if row:
+        print(f"ID: {row[0]} | Dept: {row[1]} | Gender: {row[2]} | "
+              f"Salary: ${row[3]:,.2f} | Satisfaction: {row[4]} | "
+              f"Left: {'Yes' if row[5] else 'No'}")
+    else:
+        print("No employee found with that ID.")
+
+
+# --------------------------------------------------------------------------
+# UPDATE
+# --------------------------------------------------------------------------
+def update_employee():
+    emp_id = int(input("\nEnter employee ID to update: "))
+    cursor.execute("SELECT * FROM employees WHERE id = ?", (emp_id,))
+    if not cursor.fetchone():
+        print("No employee found with that ID.")
+        return
+
+    new_salary = input("New salary (leave blank to skip): ")
+    new_satisfaction = input("New satisfaction 1-5 (leave blank to skip): ")
+
+    if new_salary:
+        cursor.execute("UPDATE employees SET salary = ? WHERE id = ?",
+                        (float(new_salary), emp_id))
+    if new_satisfaction:
+        cursor.execute("UPDATE employees SET satisfaction = ? WHERE id = ?",
+                        (int(new_satisfaction), emp_id))
+    conn.commit()
+    print(f"Employee {emp_id} updated.")
+
+
+# --------------------------------------------------------------------------
+# DELETE
+# --------------------------------------------------------------------------
+def delete_employee():
+    emp_id = int(input("\nEnter employee ID to delete: "))
+    cursor.execute("DELETE FROM employees WHERE id = ?", (emp_id,))
+    conn.commit()
+    if cursor.rowcount:
+        print(f"Employee {emp_id} deleted.")
+    else:
+        print("No employee found with that ID.")
+
+
+def menu():
+    while True:
+        print("\n===== HR DATABASE MENU =====")
+        print("1. Create a new employee")
+        print("2. Read (look up) an employee")
+        print("3. Update an employee")
+        print("4. Delete an employee")
+        print("5. Exit")
+        choice = input("Choose an option (1-5): ")
+
+        if choice == "1":
+            create_employee()
+        elif choice == "2":
+            read_employee()
+        elif choice == "3":
+            update_employee()
+        elif choice == "4":
+            delete_employee()
+        elif choice == "5":
+            print("Goodbye.")
+            break
+        else:
+            print("Invalid choice, try again.")
+
+
+if __name__ == "__main__":
+    menu()
+    conn.close()
